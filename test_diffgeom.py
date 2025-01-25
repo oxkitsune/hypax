@@ -1,5 +1,13 @@
+from typing import Callable, Sequence
 import torch
 import jax.numpy as jnp
+import time
+import jax
+
+from hax.manifolds.poincare_ball._diffgeom import expmap0 as hax_expmap0
+from hypll.manifolds.poincare_ball.math.diffgeom import expmap0 as hypll_expmap0
+
+from tqdm.auto import tqdm
 
 
 def project(x, c):
@@ -26,9 +34,6 @@ project([1, 2, 3], [0.01, 0.41, 0.12])
 
 
 def expmap0(x, c):
-    from hax.manifolds.poincare_ball._diffgeom import expmap0 as hax_expmap0
-    from hypll.manifolds.poincare_ball.math.diffgeom import expmap0 as hypll_expmap0
-
     torch_x = torch.tensor(x).float()
     torch_c = torch.tensor(c)
     torch_proj = hypll_expmap0(torch_x, torch_c)
@@ -44,3 +49,68 @@ def expmap0(x, c):
 
 expmap0([1, 2, 3], [0.1, 0.1, 0.1])
 expmap0([1, 2, 3], [0.01, 0.41, 0.12])
+
+
+def speed_torch(x, c):
+    return hypll_expmap0(x, c)
+
+
+def make_tensor(s, num_iters, key):
+    return torch.rand((num_iters, *s)).to("mps")
+
+
+def speed_jax(x, c):
+    expmap_fn = jax.vmap(hax_expmap0, in_axes=(0, 0, None))
+
+    return expmap_fn(x, c, -1)
+
+
+def make_jax_array(s, num_iters, key):
+    return jax.block_until_ready(jax.random.uniform(key, (num_iters, *s)))
+
+
+def bench_function(
+    func: Callable[[Sequence[int], int], None],
+    make_array: Callable,
+    shapes: Sequence[Sequence[int]],
+    num_runs: int = 5,
+    num_iters: int = 100_000,
+):
+    tqdm.write(f"benchmarking {func.__name__}...")
+    tqdm.write(
+        f"measuring execution time of {num_iters} iters (mean over {num_runs} runs)"
+    )
+    key = jax.random.key(0)
+    results = {s: [] for s in shapes}
+    for _ in tqdm(range(num_runs), desc=func.__name__):
+        for _ in tqdm(range(5), desc="warming up", leave=False):
+            for s in shapes:
+                keyx, keyc = jax.random.split(key, 2)
+                x = make_array(s, num_iters, keyx)
+                c = make_array(s, num_iters, keyc)
+                start = time.time()
+                jax.block_until_ready(func(x, c))
+
+        for s in shapes:
+            keyx, keyc = jax.random.split(key, 2)
+            x = make_array(s, num_iters, keyx)
+            c = make_array(s, num_iters, keyc)
+            start = time.time()
+            jax.block_until_ready(func(x, c))
+            results[s].append((time.time() - start) * 1000)
+
+    tqdm.write("========")
+    for k, v in results.items():
+        formatted_durations = ", ".join([f"{t:.4f}ms" for t in v])
+        tqdm.write(
+            f"   - {k}: {sum(v)/num_runs:.4f}ms ({len(v)} unique) [{formatted_durations}]"
+        )
+
+
+num_runs = 5
+num_iters = 10_000
+shapes = [(1, 3), (1, 30), (1, 300), (1, 3000)]
+torch_results = bench_function(speed_torch, make_tensor, shapes, num_runs, num_iters)
+jax_results = bench_function(
+    jax.jit(speed_jax), make_jax_array, shapes, num_runs, num_iters
+)

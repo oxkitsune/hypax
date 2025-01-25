@@ -8,7 +8,13 @@ authors = [
     { name = "Harold Ruiter", email = "harold.ruiter@student.uva.nl" },
 ]
 requires-python = ">=3.11"
-dependencies = ["flax>=0.10.2", "hypll>=0.1.1", "jax>=0.5.0", "torch>=2.5.1"]
+dependencies = [
+    "flax>=0.10.2",
+    "hypll>=0.1.1",
+    "jax>=0.5.0",
+    "jax-metal>=0.1.1",
+    "torch>=2.5.1",
+]
 
 [project.scripts]
 hax = "hax:main"
