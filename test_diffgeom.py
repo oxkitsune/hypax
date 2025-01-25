@@ -51,12 +51,21 @@ expmap0([1, 2, 3], [0.1, 0.1, 0.1])
 expmap0([1, 2, 3], [0.01, 0.41, 0.12])
 
 
+gpu_device = (
+    "cuda"
+    if torch.cuda.is_available()
+    else "mps"
+    if torch.backends.mps.is_available()
+    else "cpu"
+)
+
+
 def speed_torch(x, c):
     return hypll_expmap0(x, c)
 
 
 def make_tensor(s, num_iters, key):
-    return torch.rand((num_iters, *s)).to("mps")
+    return torch.rand((num_iters, *s)).to(gpu_device)
 
 
 def speed_jax(x, c):
