@@ -1,2 +1,3 @@
-def main() -> None:
-    print("Hello from hax!")
+from . import manifolds, utils, array
+
+__all__ = ["manifolds", "utils", "array"]
