@@ -555,6 +555,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "flax" },
+    { name = "hypll" },
     { name = "jax" },
     { name = "torch" },
 ]
@@ -572,6 +573,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "flax", specifier = ">=0.10.2" },
+    { name = "hypll", specifier = ">=0.1.1" },
     { name = "jax", specifier = ">=0.5.0" },
     { name = "torch", specifier = ">=2.5.1" },
 ]
@@ -611,6 +613,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/6a/40/64a912b9330786df25e58127194d4a5a7441f818b400b155e748a270f924/humanize-4.11.0.tar.gz", hash = "sha256:e66f36020a2d5a974c504bd2555cf770621dbdbb6d82f94a6857c0b1ea2608be", size = 80374 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/92/75/4bc3e242ad13f2e6c12e0b0401ab2c5e5c6f0d7da37ec69bc808e24e0ccb/humanize-4.11.0-py3-none-any.whl", hash = "sha256:b53caaec8532bcb2fff70c8826f904c35943f8cecaca29d272d9df38092736c0", size = 128055 },
+]
+
+[[package]]
+name = "hypll"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "torch" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f4/16/68078fde03689d2d64067d25b6a0bb68299858ccd1dd70ee79d34fab02f4/hypll-0.1.1.tar.gz", hash = "sha256:6d76aa088c9ad33f48ec0dbec5cf3ec5bb4bfa60b64104e740aa0d7a24a087ec", size = 24406 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/79/a4/5792c8e4c45c1aa53f83f1a2ddf395f8812c65499bab114c45392cce8b40/hypll-0.1.1-py3-none-any.whl", hash = "sha256:633943828aba9864fc0504f4c14949f902afdfdf48736c3cde055a0faf95781b", size = 34636 },
 ]
 
 [[package]]
