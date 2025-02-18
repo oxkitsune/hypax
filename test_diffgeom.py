@@ -161,6 +161,43 @@ def logmap(x, v, c):
 logmap([0.1, 0.1, 0.1], [0.3, 0.3, 0.3], [0.1, 0.1, 0.1])
 logmap([0.1, 0.1, 0.1], [0.01, 0.41, 0.12], [0.1, 0.1, 0.1])
 
+
+def gyration(u, v, w, c):
+    from hax.manifolds.poincare_ball._diffgeom import gyration as hax_gyration
+    from hypll.manifolds.poincare_ball.math.diffgeom import gyration as hypll_gyration
+
+    torch_u = torch.tensor(u, dtype=torch.float32)
+    torch_v = torch.tensor(v, dtype=torch.float32)
+    torch_w = torch.tensor(w, dtype=torch.float32)
+    torch_c = torch.tensor(c, dtype=torch.float32)
+    torch_out = hypll_gyration(torch_u, torch_v, torch_w, torch_c)
+
+    jax_u = jnp.array(u)
+    jax_v = jnp.array(v)
+    jax_w = jnp.array(w)
+    jax_c = jnp.array(c)
+    jax_out = hax_gyration(jax_u, jax_v, jax_w, jax_c)
+
+    assert jnp.all(jnp.isclose(jax_u, torch_u.numpy())), (
+        f"u differs expected: {torch_u.numpy()}, got: {jax_u}"
+    )
+    assert jnp.all(jnp.isclose(jax_v, torch_v.numpy())), (
+        f"v differs expected: {torch_v.numpy()}, got: {jax_v}"
+    )
+    assert jnp.all(jnp.isclose(jax_w, torch_w.numpy())), (
+        f"w differs expected: {torch_w.numpy()}, got: {jax_w}"
+    )
+    assert jnp.all(jnp.isclose(jax_c, torch_c.numpy())), (
+        f"c differs expected: {torch_c.numpy()}, got: {jax_c}"
+    )
+    assert jnp.all(jnp.isclose(jax_out, torch_out.numpy())), (
+        f"gyration differs expected: {torch_out.numpy()}, got: {jax_out}"
+    )
+
+
+gyration([0.1, 0.1, 0.1], [0.3, 0.3, 0.3], [0.2, 0.2, 0.2], [0.1, 0.1, 0.1])
+gyration([0.1, 0.1, 0.1], [0.01, 0.41, 0.12], [0.3, 0.2, 0.4], [0.1, 0.1, 0.1])
+
 gpu_device = (
     "cuda"
     if torch.cuda.is_available()

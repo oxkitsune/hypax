@@ -18,7 +18,6 @@ def mobius_add(x: jax.Array, y: jax.Array, c: jax.Array, axis: int = -1) -> jax.
 
 
 def project(x: jax.Array, c: jax.Array, axis: int = -1, eps: float = -1.0) -> jax.Array:
-    # Convert eps to JAX array with proper dtype
     eps = jnp.asarray(eps, dtype=x.dtype)
     eps_val = jnp.where(
         eps < 0, jnp.array(4e-3 if x.dtype == jnp.float32 else 1e-5, dtype=x.dtype), eps
@@ -92,3 +91,20 @@ def logmap(x: jax.Array, y: jax.Array, c: jax.Array, axis: int = -1):
         * min_x_y
         / min_x_y_norm
     )
+
+
+def gyration(u: jax.Array, v: jax.Array, w: jax.Array, c: jax.Array, axis: int = -1):
+    broadcast_dim = max(u.ndim, v.ndim, w.ndim)
+    axis = axis if axis >= 0 else broadcast_dim + axis
+    u2 = jnp.sum(u**2, axis=axis - broadcast_dim + u.ndim, keepdims=True)
+    v2 = jnp.sum(v**2, axis=axis - broadcast_dim + v.ndim, keepdims=True)
+    uv = jnp.sum(u * v, axis=axis - broadcast_dim + max(u.ndim, v.ndim), keepdims=True)
+    uw = jnp.sum(u * w, axis=axis - broadcast_dim + max(u.ndim, w.ndim), keepdims=True)
+    vw = jnp.sum(v * w, axis=axis - broadcast_dim + max(v.ndim, w.ndim), keepdims=True)
+
+    K2 = c**2
+    a = -K2 * uw * v2 + c * vw + 2 * K2 * uv * vw
+    b = -K2 * vw * u2 - c * uw
+    d = 1 + 2 * c * uv + K2 * u2 * v2
+
+    return w + 2 * (a * u + b * v) / jnp.maximum(d, 1e-15)
