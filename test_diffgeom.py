@@ -10,6 +10,34 @@ from hypll.manifolds.poincare_ball.math.diffgeom import expmap0 as hypll_expmap0
 from tqdm.auto import tqdm
 
 
+def mobius_add(x, y, c):
+    from hax.manifolds.poincare_ball._diffgeom import mobius_add as hax_mobius_add
+    from hypll.manifolds.poincare_ball.math.diffgeom import (
+        mobius_add as hypll_mobius_add,
+    )
+
+    torch_x = torch.tensor(x).float()
+    torch_y = torch.tensor(y).float()
+    torch_c = torch.tensor(y).float()
+    torch_mobius_add = hypll_mobius_add(torch_x, torch_y, torch_c)
+
+    jax_x = jnp.array(x)
+    jax_y = jnp.array(y)
+    jax_c = jnp.array(y)
+    jax_mobius_add = hax_mobius_add(jax_x, jax_y, jax_c)
+
+    assert jnp.all(jnp.isclose(jax_x, torch_x.numpy())), "x differs"
+    assert jnp.all(jnp.isclose(jax_y, torch_y.numpy())), "y differs"
+    assert jnp.all(jnp.isclose(jax_c, torch_c.numpy())), "c differs"
+    assert jnp.all(jnp.isclose(jax_mobius_add, torch_mobius_add.numpy())), (
+        "mobius add output differs"
+    )
+
+
+mobius_add([1, 2, 3], [0.1, 0.2, 0.3], [0.1, 0.1, 0.1])
+mobius_add([1, 2, 3], [0.1, 0.2, 0.3], [0.01, 0.41, 0.12])
+
+
 def project(x, c):
     from hax.manifolds.poincare_ball._diffgeom import project as hax_project
     from hypll.manifolds.poincare_ball.math.diffgeom import project as hypll_project
@@ -24,9 +52,9 @@ def project(x, c):
 
     assert jnp.all(jnp.isclose(jax_x, torch_x.numpy())), "x differs"
     assert jnp.all(jnp.isclose(jax_c, torch_c.numpy())), "c differs"
-    assert jnp.all(
-        jnp.isclose(jax_proj, torch_proj.numpy())
-    ), "projected output differs"
+    assert jnp.all(jnp.isclose(jax_proj, torch_proj.numpy())), (
+        "projected output differs"
+    )
 
 
 project([1, 2, 3], [0.1, 0.1, 0.1])
@@ -49,6 +77,33 @@ def expmap0(x, c):
 
 expmap0([1, 2, 3], [0.1, 0.1, 0.1])
 expmap0([1, 2, 3], [0.01, 0.41, 0.12])
+
+
+def logmap0(x, c):
+    from hax.manifolds.poincare_ball._diffgeom import logmap0 as hax_logmap0
+    from hypll.manifolds.poincare_ball.math.diffgeom import logmap0 as hypll_logmap0
+
+    torch_x = torch.tensor(x).float()
+    torch_c = torch.tensor(c)
+    torch_logmap0 = hypll_logmap0(torch_x, torch_c)
+
+    jax_x = jnp.array(x, dtype=jnp.float32)
+    jax_c = jnp.array(c)
+    jax_logmap0 = hax_logmap0(jax_x, jax_c)
+
+    assert jnp.all(jnp.isclose(jax_x, torch_x.numpy())), (
+        f"x differs, expected: {torch_x.numpy()} got: {jax_x}"
+    )
+    assert jnp.all(jnp.isclose(jax_c, torch_c.numpy())), (
+        f"c differs, expected: {torch_c.numpy()} got: {jax_c}"
+    )
+    assert jnp.all(jnp.isclose(jax_logmap0, torch_logmap0.numpy())), (
+        f"logmap0 output differs, expected: {torch_logmap0.numpy()} got: {jax_logmap0}"
+    )
+
+
+logmap0([0.1, 0.1, 0.1], [3.3, 3.3, 3.3])
+logmap0([0.1, 0.1, 0.1], [1.01, 1.41, 1.12])
 
 
 gpu_device = (
@@ -112,12 +167,12 @@ def bench_function(
     for k, v in results.items():
         formatted_durations = ", ".join([f"{t:.4f}ms" for t in v])
         tqdm.write(
-            f"   - {k}: {sum(v)/num_runs:.4f}ms ({len(v)} unique) [{formatted_durations}]"
+            f"   - {k}: {sum(v) / num_runs:.4f}ms ({len(v)} unique) [{formatted_durations}]"
         )
 
 
 num_runs = 5
-num_iters = 10_000
+num_iters = 1_000
 shapes = [(1, 3), (1, 30), (1, 300), (1, 3000)]
 torch_results = bench_function(speed_torch, make_tensor, shapes, num_runs, num_iters)
 jax_results = bench_function(
