@@ -106,6 +106,61 @@ logmap0([0.1, 0.1, 0.1], [3.3, 3.3, 3.3])
 logmap0([0.1, 0.1, 0.1], [1.01, 1.41, 1.12])
 
 
+def expmap(x, v, c):
+    from hax.manifolds.poincare_ball._diffgeom import expmap as hax_expmap
+    from hypll.manifolds.poincare_ball.math.diffgeom import expmap as hypll_expmap
+
+    torch_x = torch.tensor(x, dtype=torch.float32)
+    torch_v = torch.tensor(v, dtype=torch.float32)
+    torch_c = torch.tensor(c, dtype=torch.float32)
+    torch_expmap = hypll_expmap(torch_x, torch_v, torch_c)
+
+    jax_x = jnp.array(x)
+    jax_v = jnp.array(v)
+    jax_c = jnp.array(c)
+    jax_expmap = hax_expmap(jax_x, jax_v, jax_c)
+
+    assert jnp.all(jnp.isclose(jax_x, torch_x.numpy())), "x differs"
+    assert jnp.all(jnp.isclose(jax_v, torch_v.numpy())), "v differs"
+    assert jnp.all(jnp.isclose(jax_c, torch_c.numpy())), "c differs"
+    assert jnp.all(jnp.isclose(jax_expmap, torch_expmap.numpy())), "expmap differs"
+
+
+expmap([1, 2, 3], [3.3, 3.3, 3.3], [0.1, 0.1, 0.1])
+expmap([1, 2, 3], [1.01, 1.41, 1.12], [0.1, 0.1, 0.1])
+
+
+def logmap(x, v, c):
+    from hax.manifolds.poincare_ball._diffgeom import logmap as hax_logmap
+    from hypll.manifolds.poincare_ball.math.diffgeom import logmap as hypll_logmap
+
+    torch_x = torch.tensor(x, dtype=torch.float32)
+    torch_v = torch.tensor(v, dtype=torch.float32)
+    torch_c = torch.tensor(c, dtype=torch.float32)
+    torch_logmap = hypll_logmap(torch_x, torch_v, torch_c)
+
+    jax_x = jnp.array(x)
+    jax_v = jnp.array(v)
+    jax_c = jnp.array(c)
+    jax_logmap = hax_logmap(jax_x, jax_v, jax_c)
+
+    assert jnp.all(jnp.isclose(jax_x, torch_x.numpy())), (
+        f"x differs expected: {torch_x.numpy()}, got: {jax_x}"
+    )
+    assert jnp.all(jnp.isclose(jax_v, torch_v.numpy())), (
+        f"v differs expected: {torch_v.numpy()}, got: {jax_v}"
+    )
+    assert jnp.all(jnp.isclose(jax_c, torch_c.numpy())), (
+        f"c differs expected: {torch_c.numpy()}, got: {jax_c}"
+    )
+    assert jnp.all(jnp.isclose(jax_logmap, torch_logmap.numpy())), (
+        f"logmap differs expected: {torch_logmap.numpy()}, got: {jax_logmap}"
+    )
+
+
+logmap([0.1, 0.1, 0.1], [0.3, 0.3, 0.3], [0.1, 0.1, 0.1])
+logmap([0.1, 0.1, 0.1], [0.01, 0.41, 0.12], [0.1, 0.1, 0.1])
+
 gpu_device = (
     "cuda"
     if torch.cuda.is_available()
