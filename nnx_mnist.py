@@ -7,6 +7,7 @@ import jax.numpy as jnp
 from tqdm.auto import tqdm
 
 from hax.util.data import NumpyLoader
+from hax.opt import riemannian_adam
 
 print("Loading dataset...")
 
@@ -51,7 +52,7 @@ model = CNN(rngs=nnx.Rngs(0))
 learning_rate = 0.005
 momentum = 0.9
 
-optimizer = nnx.Optimizer(model, optax.adamw(learning_rate, momentum))
+optimizer = nnx.Optimizer(model, riemannian_adam(learning_rate))
 metrics = nnx.MultiMetric(
     accuracy=nnx.metrics.Accuracy(),
     loss=nnx.metrics.Average("loss"),
@@ -119,7 +120,7 @@ num_epochs = 100
 for epoch in tqdm(range(num_epochs), desc="Epoch"):
     train_single_epoch()
 
-    msg = f"[{epoch+1}/{num_epochs}]"
+    msg = f"[{epoch + 1}/{num_epochs}]"
 
     # Training metrics
     train_metrics = metrics.compute()

@@ -1,106 +1,85 @@
+from functools import partial
+from typing import NamedTuple
+
 import jax
 import jax.numpy as jnp
 
+from optax import GradientTransformation
 
-def riemannian_adam(lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0, amsgrad=False):
+
+def riemannian_adam(
+    lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0, amsgrad=False
+) -> GradientTransformation:
+    beta1, beta2 = betas
+
     def init_fn(params):
-        def init_state(param):
-            # Manifold parameter: assume dict with key "manifold" and "tensor"
-            if isinstance(param, dict) and "manifold" in param:
-                t = param["tensor"]
-                state = {"step": 0, "m": jnp.zeros_like(t), "v": jnp.zeros_like(t)}
+        def _init_leaf(p):
+            m = jnp.zeros_like(p["tensor"] if isinstance(p, dict) else p)
+            v = jnp.zeros_like(m if p.ndim == 0 else m.sum(axis=-1, keepdims=True))
+            buf = {"m": m, "v": v, "step": jnp.zeros([], jnp.int32)}
+            if amsgrad:
+                buf["v_hat"] = jnp.zeros_like(v)
+            return buf
+
+        return jax.tree_map(_init_leaf, params)
+
+    def update_fn(grads, state, params):
+        def _update_leaf(p, g, s):
+            step = s["step"] + 1
+
+            # manifold leaf
+            if isinstance(p, dict):
+                M, x = p["manifold"], p["tensor"]
+                g = g + weight_decay * x
+                g = M.euc_to_tangent(x, g)
+                m = beta1 * s["m"] + (1 - beta1) * g
+                v = beta2 * s["v"] + (1 - beta2) * M.inner(g, g, keepdim=True)
+
+                v_corr = v / (1 - beta2**step)
                 if amsgrad:
-                    state["v_hat"] = jnp.zeros_like(t)
-                return state
-            else:
-                state = {"step": 0, "m": jnp.zeros_like(param)}
+                    v_hat = jnp.maximum(s["v_hat"], v)
+                    v_corr = v_hat / (1 - beta2**step)
 
-                # For Euclidean parameters, v is computed as a summed quantity over the last axis.
-                state["v"] = (
-                    jnp.zeros(param.shape[:-1] + (1,))
-                    if param.ndim > 0
-                    else jnp.zeros_like(param)
-                )
-                if amsgrad:
-                    state["v_hat"] = state["v"]
-                return state
-
-        opt_state = jax.tree_util.tree_map(init_state, params)
-        return {
-            "params": params,
-            "state": opt_state,
-            "hyperparams": {
-                "lr": lr,
-                "betas": betas,
-                "eps": eps,
-                "weight_decay": weight_decay,
-                "amsgrad": amsgrad,
-            },
-        }
-
-    def update_fn(grads, opt_state):
-        hp = opt_state["hyperparams"]
-        beta1, beta2 = hp["betas"]
-        lr = hp["lr"]
-        eps = hp["eps"]
-        weight_decay = hp["weight_decay"]
-        amsgrad = hp["amsgrad"]
-
-        def update_single(param, grad, state):
-            step = state["step"] + 1
-            if isinstance(param, dict) and "manifold" in param:
-                manifold = param["manifold"]
-                # Weight decay on the Euclidean representation.
-                grad = grad + weight_decay * param["tensor"]
-                # Convert to tangent vector.
-                g = manifold.euc_to_tangent(param, grad)
-                m = beta1 * state["m"] + (1 - beta1) * g
-                v_new = beta2 * state["v"] + (1 - beta2) * manifold.inner(
-                    g, g, keepdim=True, safe_mode=False
-                )
-                if amsgrad:
-                    v_hat = jnp.maximum(state["v_hat"], v_new)
-                    denom = jnp.sqrt(v_hat / (1 - beta2**step)) + eps
-                else:
-                    denom = jnp.sqrt(v_new / (1 - beta2**step)) + eps
-                direction = -lr * (m / (1 - beta1**step)) / denom
-                new_tensor = manifold.expmap(param["tensor"], direction)
-                new_m = manifold.transp(param["tensor"], new_tensor, m)
-                new_param = dict(param, tensor=new_tensor)
-                new_state = {"step": step, "m": new_m, "v": v_new}
+                m_corr = m / (1 - beta1**step)
+                update = -lr * m_corr / (jnp.sqrt(v_corr) + eps)  # tangent
+                new_state = {"m": m, "v": v, "step": step}
                 if amsgrad:
                     new_state["v_hat"] = v_hat
-                return new_param, new_state
+                return update, new_state
+
             else:
-                grad = grad + weight_decay * param
-                m = beta1 * state["m"] + (1 - beta1) * grad
-                v_new = beta2 * state["v"] + (1 - beta2) * jnp.sum(
-                    grad**2, axis=-1, keepdims=True
-                )
+                # euclidean leaf
+                g = g + weight_decay * p
+                m = beta1 * s["m"] + (1 - beta1) * g
+                v = beta2 * s["v"] + (1 - beta2) * jnp.sum(g**2, axis=-1, keepdims=True)
+
+                v_corr = v / (1 - beta2**step)
                 if amsgrad:
-                    v_hat = jnp.maximum(state["v_hat"], v_new)
-                    denom = jnp.sqrt(v_hat / (1 - beta2**step)) + eps
-                else:
-                    denom = jnp.sqrt(v_new / (1 - beta2**step)) + eps
-                direction = m / (1 - beta1**step) / denom
-                new_param = param - lr * direction
-                new_state = {"step": step, "m": m, "v": v_new}
+                    v_hat = jnp.maximum(s["v_hat"], v)
+                    v_corr = v_hat / (1 - beta2**step)
+
+                m_corr = m / (1 - beta1**step)
+                update = -lr * m_corr / (jnp.sqrt(v_corr) + eps)
+                new_state = {"m": m, "v": v, "step": step}
                 if amsgrad:
                     new_state["v_hat"] = v_hat
-                return new_param, new_state
+                return update, new_state
 
-        # Apply update_single over the pytree.
-        updated = jax.tree_util.tree_map(
-            lambda p, g, s: update_single(p, g, s),
-            opt_state["params"],
+        leaf_results = jax.tree_util.tree_map(
+            _update_leaf,
+            params,
             grads,
-            opt_state["state"],
+            state,
+            is_leaf=lambda x: isinstance(x, tuple),  # keep tuples closed
         )
-        new_params = jax.tree_util.tree_map(lambda tup: tup[0], updated)
-        new_state = jax.tree_util.tree_map(lambda tup: tup[1], updated)
-        return {"params": new_params, "state": new_state, "hyperparams": hp}
 
-    def get_params(opt_state):
-        return opt_state["params"]
+        updates = jax.tree_util.tree_map(
+            lambda t: t[0], leaf_results, is_leaf=lambda x: isinstance(x, tuple)
+        )
+        new_state = jax.tree_util.tree_map(
+            lambda t: t[1], leaf_results, is_leaf=lambda x: isinstance(x, tuple)
+        )
 
-    return init_fn, update_fn, get_params
+        return updates, new_state
+
+    return GradientTransformation(init_fn, update_fn)
