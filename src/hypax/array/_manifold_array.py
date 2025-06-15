@@ -1,11 +1,11 @@
 import jax
 import jax.numpy as jnp
 
-from hax.manifolds import Manifold
+from hypax.manifolds import Manifold
 
 
 # perhaps we should *extend* jax.Array, and make a "DeviceManifoldArray" etc?
-# however, this will make hax more complex
+# however, this will make hypax more complex
 class ManifoldArray:
     def __init__(self, data: jax.Array, manifold: Manifold):
         self.array = data

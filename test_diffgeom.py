@@ -4,14 +4,14 @@ import jax.numpy as jnp
 import time
 import jax
 
-from hax.manifolds.poincare_ball._diffgeom import expmap0 as hax_expmap0
+from hypax.manifolds.poincare_ball._diffgeom import expmap0 as hypax_expmap0
 from hypll.manifolds.poincare_ball.math.diffgeom import expmap0 as hypll_expmap0
 
 from tqdm.auto import tqdm
 
 
 def mobius_add(x, y, c):
-    from hax.manifolds.poincare_ball._diffgeom import mobius_add as hax_mobius_add
+    from hypax.manifolds.poincare_ball._diffgeom import mobius_add as hypax_mobius_add
     from hypll.manifolds.poincare_ball.math.diffgeom import (
         mobius_add as hypll_mobius_add,
     )
@@ -24,7 +24,7 @@ def mobius_add(x, y, c):
     jax_x = jnp.array(x)
     jax_y = jnp.array(y)
     jax_c = jnp.array(y)
-    jax_mobius_add = hax_mobius_add(jax_x, jax_y, jax_c)
+    jax_mobius_add = hypax_mobius_add(jax_x, jax_y, jax_c)
 
     assert jnp.all(jnp.isclose(jax_x, torch_x.numpy())), "x differs"
     assert jnp.all(jnp.isclose(jax_y, torch_y.numpy())), "y differs"
@@ -39,7 +39,7 @@ mobius_add([1, 2, 3], [0.1, 0.2, 0.3], [0.01, 0.41, 0.12])
 
 
 def project(x, c):
-    from hax.manifolds.poincare_ball._diffgeom import project as hax_project
+    from hypax.manifolds.poincare_ball._diffgeom import project as hypax_project
     from hypll.manifolds.poincare_ball.math.diffgeom import project as hypll_project
 
     torch_x = torch.tensor(x).float()
@@ -48,7 +48,7 @@ def project(x, c):
 
     jax_x = jnp.array(x, dtype=jnp.float32)
     jax_c = jnp.array(c)
-    jax_proj = hax_project(jax_x, jax_c)
+    jax_proj = hypax_project(jax_x, jax_c)
 
     assert jnp.all(jnp.isclose(jax_x, torch_x.numpy())), "x differs"
     assert jnp.all(jnp.isclose(jax_c, torch_c.numpy())), "c differs"
@@ -68,7 +68,7 @@ def expmap0(x, c):
 
     jax_x = jnp.array(x, dtype=jnp.float32)
     jax_c = jnp.array(c)
-    jax_proj = hax_expmap0(jax_x, jax_c)
+    jax_proj = hypax_expmap0(jax_x, jax_c)
 
     assert jnp.all(jnp.isclose(jax_x, torch_x.numpy())), "x differs"
     assert jnp.all(jnp.isclose(jax_c, torch_c.numpy())), "c differs"
@@ -80,7 +80,7 @@ expmap0([1, 2, 3], [0.01, 0.41, 0.12])
 
 
 def logmap0(x, c):
-    from hax.manifolds.poincare_ball._diffgeom import logmap0 as hax_logmap0
+    from hypax.manifolds.poincare_ball._diffgeom import logmap0 as hypax_logmap0
     from hypll.manifolds.poincare_ball.math.diffgeom import logmap0 as hypll_logmap0
 
     torch_x = torch.tensor(x).float()
@@ -89,7 +89,7 @@ def logmap0(x, c):
 
     jax_x = jnp.array(x, dtype=jnp.float32)
     jax_c = jnp.array(c)
-    jax_logmap0 = hax_logmap0(jax_x, jax_c)
+    jax_logmap0 = hypax_logmap0(jax_x, jax_c)
 
     assert jnp.all(jnp.isclose(jax_x, torch_x.numpy())), (
         f"x differs, expected: {torch_x.numpy()} got: {jax_x}"
@@ -107,7 +107,7 @@ logmap0([0.1, 0.1, 0.1], [1.01, 1.41, 1.12])
 
 
 def expmap(x, v, c):
-    from hax.manifolds.poincare_ball._diffgeom import expmap as hax_expmap
+    from hypax.manifolds.poincare_ball._diffgeom import expmap as hypax_expmap
     from hypll.manifolds.poincare_ball.math.diffgeom import expmap as hypll_expmap
 
     torch_x = torch.tensor(x, dtype=torch.float32)
@@ -118,7 +118,7 @@ def expmap(x, v, c):
     jax_x = jnp.array(x)
     jax_v = jnp.array(v)
     jax_c = jnp.array(c)
-    jax_expmap = hax_expmap(jax_x, jax_v, jax_c)
+    jax_expmap = hypax_expmap(jax_x, jax_v, jax_c)
 
     assert jnp.all(jnp.isclose(jax_x, torch_x.numpy())), "x differs"
     assert jnp.all(jnp.isclose(jax_v, torch_v.numpy())), "v differs"
@@ -131,7 +131,7 @@ expmap([1, 2, 3], [1.01, 1.41, 1.12], [0.1, 0.1, 0.1])
 
 
 def logmap(x, v, c):
-    from hax.manifolds.poincare_ball._diffgeom import logmap as hax_logmap
+    from hypax.manifolds.poincare_ball._diffgeom import logmap as hypax_logmap
     from hypll.manifolds.poincare_ball.math.diffgeom import logmap as hypll_logmap
 
     torch_x = torch.tensor(x, dtype=torch.float32)
@@ -142,7 +142,7 @@ def logmap(x, v, c):
     jax_x = jnp.array(x)
     jax_v = jnp.array(v)
     jax_c = jnp.array(c)
-    jax_logmap = hax_logmap(jax_x, jax_v, jax_c)
+    jax_logmap = hypax_logmap(jax_x, jax_v, jax_c)
 
     assert jnp.all(jnp.isclose(jax_x, torch_x.numpy())), (
         f"x differs expected: {torch_x.numpy()}, got: {jax_x}"
@@ -163,7 +163,7 @@ logmap([0.1, 0.1, 0.1], [0.01, 0.41, 0.12], [0.1, 0.1, 0.1])
 
 
 def gyration(u, v, w, c):
-    from hax.manifolds.poincare_ball._diffgeom import gyration as hax_gyration
+    from hypax.manifolds.poincare_ball._diffgeom import gyration as hypax_gyration
     from hypll.manifolds.poincare_ball.math.diffgeom import gyration as hypll_gyration
 
     torch_u = torch.tensor(u, dtype=torch.float32)
@@ -176,7 +176,7 @@ def gyration(u, v, w, c):
     jax_v = jnp.array(v)
     jax_w = jnp.array(w)
     jax_c = jnp.array(c)
-    jax_out = hax_gyration(jax_u, jax_v, jax_w, jax_c)
+    jax_out = hypax_gyration(jax_u, jax_v, jax_w, jax_c)
 
     assert jnp.all(jnp.isclose(jax_u, torch_u.numpy())), (
         f"u differs expected: {torch_u.numpy()}, got: {jax_u}"
@@ -216,7 +216,7 @@ def make_tensor(s, num_iters, key):
 
 
 def speed_jax(x, c):
-    expmap_fn = jax.vmap(hax_expmap0, in_axes=(0, 0, None))
+    expmap_fn = jax.vmap(hypax_expmap0, in_axes=(0, 0, None))
 
     return expmap_fn(x, c, -1)
 

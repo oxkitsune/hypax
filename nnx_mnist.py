@@ -6,8 +6,8 @@ import jax.numpy as jnp
 
 from tqdm.auto import tqdm
 
-from hax.util.data import NumpyLoader
-from hax.opt import riemannian_adam
+from hypax.util.data import NumpyLoader
+from hypax.opt import riemannian_adam
 
 print("Loading dataset...")
 
