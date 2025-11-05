@@ -59,13 +59,8 @@ def expmap(x: jax.Array, v: jax.Array, c: jax.Array, axis: int = -1):
     v_norm = jnp.linalg.norm(v, axis=axis - broadcast_dim + v.ndim, keepdims=True)
     v_norm = jnp.maximum(v_norm, 1e-15)
 
-    lambda_x = 2 / (
-        1
-        - c
-        * jnp.square(x)
-        .sum(axis=axis - broadcast_dim + x.ndim, keepdims=True)
-        .clip(min=1e-15),
-    )
+    x_norm_sq = jnp.square(x).sum(axis=axis - broadcast_dim + x.ndim, keepdims=True)
+    lambda_x = 2 / jnp.clip(1 - c * x_norm_sq, min=1e-15)
 
     c_sqrt = jnp.sqrt(c)
     second_term = jnp.tanh(c_sqrt * lambda_x * v_norm / 2) * v / (c_sqrt * v_norm)
@@ -78,15 +73,10 @@ def logmap(x: jax.Array, y: jax.Array, c: jax.Array, axis: int = -1):
     axis = axis if axis >= 0 else broadcast_dim + axis
 
     min_x_y = mobius_add(-x, y, c, axis=axis)
-    min_x_y_norm = jnp.linalg.norm(min_x_y, axis=axis, keepdims=True).clip(min=1e-15)
+    min_x_y_norm = jnp.clip(jnp.linalg.norm(min_x_y, axis=axis, keepdims=True), min=1e-15)
 
-    lambda_x = 2 / (
-        1
-        - c
-        * jnp.square(x)
-        .sum(axis=axis - broadcast_dim + x.ndim, keepdims=True)
-        .clip(min=1e-15)
-    )
+    x_norm_sq = jnp.square(x).sum(axis=axis - broadcast_dim + x.ndim, keepdims=True)
+    lambda_x = 2 / jnp.clip(1 - c * x_norm_sq, min=1e-15)
 
     c_sqrt = jnp.sqrt(c)
     return (
@@ -119,13 +109,11 @@ def transp(x: jax.Array, y: jax.Array, v: jax.Array, c: jax.Array, axis: int = -
     broadcast_dim = max(x.ndim, y.ndim, v.ndim)
     axis = axis if axis >= 0 else broadcast_dim + axis
 
-    lambda_x = 2 / (
-        1 - c * jnp.square(x).sum(axis=axis - broadcast_dim + x.ndim, keepdims=True)
-    ).clip(min=1e-15)
+    x_norm_sq = jnp.square(x).sum(axis=axis - broadcast_dim + x.ndim, keepdims=True)
+    lambda_x = 2 / jnp.clip(1 - c * x_norm_sq, min=1e-15)
 
-    lambda_y = 2 / (
-        1 - c * jnp.square(y).sum(axis=axis - broadcast_dim + y.ndim, keepdims=True)
-    ).clip(min=1e-15)
+    y_norm_sq = jnp.square(y).sum(axis=axis - broadcast_dim + y.ndim, keepdims=True)
+    lambda_y = 2 / jnp.clip(1 - c * y_norm_sq, min=1e-15)
 
     return gyration(y, -x, v, c, axis=axis) * lambda_x / lambda_y
 
@@ -157,13 +145,8 @@ def inner(
 ) -> jax.Array:
     broadcast_dim = max(x.ndim, u.ndim, v.ndim)
     axis = axis if axis >= 0 else broadcast_dim + axis
-    lambda_x = 2 / (
-        1
-        - c
-        * jnp.square(x)
-        .sum(axis=axis - broadcast_dim + x.ndim, keepdims=True)
-        .clip(min=1e-15)
-    )
+    x_norm_sq = jnp.square(x).sum(axis=axis - broadcast_dim + x.ndim, keepdims=True)
+    lambda_x = 2 / jnp.clip(1 - c * x_norm_sq, min=1e-15)
     dot_prod = (u * v).sum(axis=axis, keepdims=keepdims)
     return jnp.square(lambda_x) * dot_prod
 
@@ -173,13 +156,8 @@ def euc_to_tangent(
 ) -> jax.Array:
     broadcast_dim = max(x.ndim, u.ndim)
     axis = axis if axis >= 0 else broadcast_dim + axis
-    lambda_x = 2 / (
-        1
-        - c
-        * jnp.square(x)
-        .sum(axis=axis - broadcast_dim + x.ndim, keepdims=True)
-        .clip(min=1e-15)
-    )
+    x_norm_sq = jnp.square(x).sum(axis=axis - broadcast_dim + x.ndim, keepdims=True)
+    lambda_x = 2 / jnp.clip(1 - c * x_norm_sq, min=1e-15)
     return u / jnp.square(lambda_x)
 
 
@@ -191,7 +169,7 @@ def mobius_add_batch(x: jax.Array, y: jax.Array, c: jax.Array) -> jax.Array:
     num = jnp.expand_dims(num, axis=2) * jnp.expand_dims(x, axis=2)
     num = num + jnp.expand_dims(1 - c * x2, axis=3) * jnp.expand_dims(y, axis=1)
     denom = 1 + 2 * c * xy + jnp.square(c) * x2 * jnp.permute_dims(y2, (0, 2, 1))
-    return num / jnp.expand_dims(denom, axis=3).clip(min=1e-15)
+    return num / jnp.clip(jnp.expand_dims(denom, axis=3), min=1e-15)
 
 
 def cdist(x: jax.Array, y: jax.Array, c: jax.Array) -> jax.Array:

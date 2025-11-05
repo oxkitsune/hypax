@@ -1,5 +1,9 @@
 import jax
 import jax.numpy as jnp
+from typing import Tuple
+
+from hypax.manifolds.poincare_ball._diffgeom import logmap0, expmap0
+from hypax.utils.math import beta_func
 
 
 def poincare_hyperplane_dists(
@@ -24,8 +28,8 @@ def poincare_hyperplane_dists(
 
     axis_shifted_x = jnp.moveaxis(x, source=axis, destination=-1)
 
-    c_sqrt = c.sqrt()
-    lam = 2 / (1 - c * jnp.pow(axis_shifted_x, 2).sum(axis=-1, keepdim=True))
+    c_sqrt = jnp.sqrt(c)
+    lam = 2 / (1 - c * jnp.pow(axis_shifted_x, 2).sum(axis=-1, keepdims=True))
     z_norm = jnp.linalg.norm(z, axis=0)
     z_norm = jnp.maximum(z_norm, 1e-15)
 
@@ -48,8 +52,8 @@ def poincare_hyperplane_dists(
                 * lam
                 / z_norm
                 * jnp.matmul(axis_shifted_x, z)
-                * two_csqrt_r.cosh()
-                - (lam - 1) * two_csqrt_r.sinh()
+                * jnp.cosh(two_csqrt_r)
+                - (lam - 1) * jnp.sinh(two_csqrt_r)
             )
         )
 
@@ -75,7 +79,125 @@ def poincare_fully_connected(
     Returns:
         jax.Array: Poincare FC transformed hyperbolic array, commonly denoted by y
     """
-    c_sqrt = c.sqrt()
+    c_sqrt = jnp.sqrt(c)
     x = poincare_hyperplane_dists(x=x, z=z, r=bias, c=c, axis=axis)
-    x = (c_sqrt * x).sinh() / c_sqrt
-    return x / (1 + (1 + c * jnp.pow(x, 2).sum(axis=axis, keepdim=True)).sqrt())
+    x = jnp.sinh(c_sqrt * x) / c_sqrt
+    return x / (1 + jnp.sqrt(1 + c * jnp.pow(x, 2).sum(axis=axis, keepdims=True)))
+
+
+def unfold_2d(
+    x: jax.Array,
+    kernel_size: Tuple[int, int],
+    stride: int = 1,
+    padding: int = 0,
+) -> jax.Array:
+    """Extract sliding local blocks from a batched 2D input (im2col operation).
+
+    This is the JAX equivalent of PyTorch's torch.nn.functional.unfold.
+
+    Args:
+        x: Input array with shape [batch, channels, height, width]
+        kernel_size: Size of the sliding blocks as (kernel_h, kernel_w)
+        stride: Stride of the sliding blocks (default: 1)
+        padding: Implicit zero padding on both sides (default: 0)
+
+    Returns:
+        Array with shape [batch, channels * kernel_h * kernel_w, num_patches]
+        where num_patches = out_h * out_w
+    """
+    batch_size, channels, height, width = x.shape
+    kernel_h, kernel_w = kernel_size
+
+    # Apply padding if needed
+    if padding > 0:
+        x = jnp.pad(
+            x,
+            ((0, 0), (0, 0), (padding, padding), (padding, padding)),
+            mode="constant",
+            constant_values=0,
+        )
+        height += 2 * padding
+        width += 2 * padding
+
+    # Calculate output dimensions
+    out_h = (height - kernel_h) // stride + 1
+    out_w = (width - kernel_w) // stride + 1
+
+    # Extract patches using strided slicing
+    # Create indices for all patches
+    patches = []
+    for i in range(out_h):
+        for j in range(out_w):
+            h_start = i * stride
+            w_start = j * stride
+            patch = x[:, :, h_start : h_start + kernel_h, w_start : w_start + kernel_w]
+            # Reshape to [batch, channels * kernel_h * kernel_w]
+            patch = patch.reshape(batch_size, -1)
+            patches.append(patch)
+
+    # Stack all patches: [batch, channels * kernel_h * kernel_w, num_patches]
+    output = jnp.stack(patches, axis=-1)
+
+    return output
+
+
+def poincare_unfold(
+    x: jax.Array,
+    kernel_size: Tuple[int, int],
+    in_channels: int,
+    c: jax.Array,
+    stride: int = 1,
+    padding: int = 0,
+    axis: int = 1,
+) -> jax.Array:
+    """Hyperbolic unfold operation for 2D convolution in the Poincare ball model.
+
+    This operation extracts patches from the input and applies beta-concatenation
+    to properly combine hyperbolic vectors when increasing dimensionality.
+
+    The operation:
+    1. Maps input from manifold to tangent space at origin (logmap0)
+    2. Applies beta-concatenation rescaling to maintain hyperbolic geometry
+    3. Extracts patches using standard unfold (im2col)
+    4. Maps result back to manifold (expmap0)
+
+    Args:
+        x: Input array with shape [batch, channels, height, width]
+        kernel_size: Size of the convolving kernel as (kernel_h, kernel_w)
+        in_channels: Number of input channels
+        c: Curvature of the Poincare ball
+        stride: Stride of the convolution (default: 1)
+        padding: Zero-padding added to both sides of the input (default: 0)
+        axis: The manifold axis (default: 1 for channels)
+
+    Returns:
+        Unfolded array with shape [batch, kernel_vol * in_channels, num_patches]
+        where kernel_vol = kernel_h * kernel_w and num_patches = out_h * out_w
+
+    References:
+        Chen et al. "Fully Hyperbolic Neural Networks" (HNN++), ACL 2022
+        Beta-concatenation is used to properly rescale vectors when concatenating
+        in hyperbolic space to preserve geometric properties.
+    """
+    kernel_h, kernel_w = kernel_size
+    kernel_vol = kernel_h * kernel_w
+
+    # Step 1: Map to tangent space at origin
+    x_tangent = logmap0(x, c, axis=axis)
+
+    # Step 2: Apply beta-concatenation rescaling
+    # When concatenating vectors in hyperbolic space, we need to rescale
+    # beta_ni corresponds to the original dimension (in_channels)
+    # beta_n corresponds to the new dimension (in_channels * kernel_vol)
+    beta_ni = beta_func(in_channels / 2, 1 / 2)
+    beta_n = beta_func(in_channels * kernel_vol / 2, 1 / 2)
+    rescale_factor = beta_n / beta_ni
+    x_tangent = x_tangent * rescale_factor
+
+    # Step 3: Apply Euclidean unfold in tangent space
+    x_unfolded = unfold_2d(x_tangent, kernel_size, stride, padding)
+
+    # Step 4: Map back to manifold
+    x_manifold = expmap0(x_unfolded, c, axis=axis)
+
+    return x_manifold
