@@ -30,8 +30,8 @@ class PoincareBall(Manifold):
     the curvature.
 
     Attributes:
-        c: Curvature of the manifold (scalar > 0). Higher curvature means
-           more "curved" space with a smaller radius.
+        curvature: Curvature of the manifold (scalar > 0). Higher curvature means
+                   more "curved" space with a smaller radius.
 
     Example:
         >>> manifold = PoincareBall(c=1.0)
@@ -48,10 +48,12 @@ class PoincareBall(Manifold):
                Can be a scalar float or JAX array.
         """
         super().__init__()
-        self.c = jnp.asarray(c) if not isinstance(c, jax.Array) else c
+        c_array = jnp.asarray(c) if not isinstance(c, jax.Array) else c
 
-        if jnp.any(self.c <= 0):
+        if jnp.any(c_array <= 0):
             raise ValueError(f"Curvature must be positive, got {c}")
+
+        self.curvature = nnx.Param(c_array)
 
     def expmap(
         self, v: jax.Array, x: jax.Array | None = None, axis: int = -1
@@ -67,9 +69,9 @@ class PoincareBall(Manifold):
             Point on manifold
         """
         if x is None:
-            return expmap0(v, self.c, axis=axis)
+            return expmap0(v, self.curvature.value, axis=axis)
         else:
-            return expmap(x, v, self.c, axis=axis)
+            return expmap(x, v, self.curvature.value, axis=axis)
 
     def logmap(
         self, y: jax.Array, x: jax.Array | None = None, axis: int = -1
@@ -85,9 +87,9 @@ class PoincareBall(Manifold):
             Tangent vector at base point
         """
         if x is None:
-            return logmap0(y, self.c, axis=axis)
+            return logmap0(y, self.curvature.value, axis=axis)
         else:
-            return logmap(x, y, self.c, axis=axis)
+            return logmap(x, y, self.curvature.value, axis=axis)
 
     def project(self, x: jax.Array, axis: int = -1, eps: float = -1.0) -> jax.Array:
         """Project point to be within the Poincaré ball.
@@ -100,7 +102,7 @@ class PoincareBall(Manifold):
         Returns:
             Point projected to be within ball
         """
-        return project(x, self.c, axis=axis, eps=eps)
+        return project(x, self.curvature.value, axis=axis, eps=eps)
 
     def mobius_add(self, x: jax.Array, y: jax.Array, axis: int = -1) -> jax.Array:
         """Möbius addition in the Poincaré ball.
@@ -113,7 +115,7 @@ class PoincareBall(Manifold):
         Returns:
             Result of Möbius addition
         """
-        return mobius_add(x, y, self.c, axis=axis)
+        return mobius_add(x, y, self.curvature.value, axis=axis)
 
     def dist(
         self, x: jax.Array, y: jax.Array, axis: int = -1, keepdims: bool = False
@@ -129,7 +131,7 @@ class PoincareBall(Manifold):
         Returns:
             Hyperbolic distance
         """
-        return dist(x, y, self.c, axis=axis, keepdims=keepdims)
+        return dist(x, y, self.curvature.value, axis=axis, keepdims=keepdims)
 
     def construct_dl_parameters(
         self,
@@ -210,6 +212,8 @@ class PoincareBall(Manifold):
         References:
             Chen et al. "Fully Hyperbolic Neural Networks" (HNN++), ACL 2022
         """
-        result = poincare_fully_connected(x=x, z=z, bias=bias, c=self.c, axis=axis)
+        result = poincare_fully_connected(
+            x=x, z=z, bias=bias, c=self.curvature.value, axis=axis
+        )
         # Project result to ensure it stays in the ball
         return self.project(result, axis=axis)

@@ -14,7 +14,7 @@ class MockManifold(nnx.Module):
 
     def __init__(self, c: float = 1.0):
         super().__init__()
-        self.c = jnp.array(c)
+        self.curvature = nnx.Param(jnp.array(c))
 
 
 def test_hconv2d_initialization():
@@ -40,7 +40,10 @@ def test_hconv2d_initialization():
     assert conv.padding == 0
 
     # Check parameter shapes
-    assert conv.weights.value.shape == (3 * 9, 16)  # (in_channels * kernel_vol, out_channels)
+    assert conv.weights.value.shape == (
+        3 * 9,
+        16,
+    )  # (in_channels * kernel_vol, out_channels)
     assert conv.bias.value.shape == (16,)
 
 
@@ -290,7 +293,7 @@ def test_hconv2d_gradient_flow():
     def loss_fn(params):
         conv.weights.value = params
         output = conv(x)
-        return jnp.mean(output.array ** 2)
+        return jnp.mean(output.array**2)
 
     # Compute gradients
     grad_fn = jax.grad(loss_fn)
@@ -347,6 +350,7 @@ def test_hconv2d_manifold_without_curvature():
 
     class ManifoldNoCurvature(nnx.Module):
         """Manifold without curvature attribute."""
+
         pass
 
     manifold = ManifoldNoCurvature()

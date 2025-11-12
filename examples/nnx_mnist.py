@@ -6,8 +6,11 @@ import jax.numpy as jnp
 
 from tqdm.auto import tqdm
 
-from hypax.util.data import NumpyLoader
+from hypax.utils.data import NumpyLoader
 from hypax.opt import riemannian_adam
+from hypax.manifolds.poincare_ball import PoincareBall
+from hypax.array import ManifoldArray
+from hypax.nn import HConvolution2D, HLinear, hrelu
 
 print("Loading dataset...")
 
@@ -23,32 +26,61 @@ eval_loader = NumpyLoader(dataset["test"], batch_size=batch_size)
 eval_ds = dataset["test"].iter(batch_size=batch_size)
 
 
-class CNN(nnx.Module):
-    """A simple CNN model with corrected dimensions."""
+class HyperbolicCNN(nnx.Module):
+    """A hyperbolic CNN model using hyperbolic layers."""
 
-    def __init__(self, *, rngs: nnx.Rngs):
-        self.conv1 = nnx.Conv(1, 32, kernel_size=(3, 3), padding="SAME", rngs=rngs)
-        self.conv2 = nnx.Conv(32, 64, kernel_size=(3, 3), padding="SAME", rngs=rngs)
+    def __init__(self, *, rngs: nnx.Rngs, manifold: PoincareBall):
+        self.manifold = manifold
+        # Hyperbolic convolution layers
+        self.conv1 = HConvolution2D(
+            1, 32, kernel_size=3, padding=1, manifold=manifold, rngs=rngs
+        )
+        self.conv2 = HConvolution2D(
+            32, 64, kernel_size=3, padding=1, manifold=manifold, rngs=rngs
+        )
         self.avg_pool = partial(nnx.avg_pool, window_shape=(2, 2), strides=(2, 2))
-        self.linear1 = nnx.Linear(
-            64 * 7 * 7, 256, rngs=rngs
-        )  # Corrected input features
-        self.linear2 = nnx.Linear(256, 10, rngs=rngs)
+        # Hyperbolic linear layers
+        self.linear1 = HLinear(
+            64 * 7 * 7, 256, manifold=manifold, rngs=rngs
+        )
+        self.linear2 = HLinear(256, 10, manifold=manifold, rngs=rngs)
 
     def __call__(self, x):
-        x = nnx.relu(self.conv1(x))
-        x = self.avg_pool(x)
-        x = nnx.relu(self.conv2(x))
-        x = self.avg_pool(x)
-        x = x.reshape(x.shape[0], -1)  # Flatten to (batch_size, 64*7*7)
-        x = nnx.relu(self.linear1(x))
+        # Input x should be a regular JAX array, wrap it in ManifoldArray
+        x = ManifoldArray(data=x, manifold=self.manifold)
+
+        # Hyperbolic conv + activation
+        x = self.conv1(x)
+        x = hrelu(x)
+        # Pool in regular space (extract array, pool, wrap back)
+        x = ManifoldArray(data=self.avg_pool(x.array), manifold=self.manifold)
+
+        x = self.conv2(x)
+        x = hrelu(x)
+        x = ManifoldArray(data=self.avg_pool(x.array), manifold=self.manifold)
+
+        # Flatten to (batch_size, 64*7*7)
+        batch_size = x.shape[0]
+        x = ManifoldArray(
+            data=x.array.reshape(batch_size, -1),
+            manifold=self.manifold
+        )
+
+        # Hyperbolic linear layers
+        x = self.linear1(x)
+        x = hrelu(x)
         x = self.linear2(x)
-        return x
+
+        # Return the underlying array for loss computation
+        return x.array
 
 
 print("Creating model...")
-# Instantiate the model with corrected architecture
-model = CNN(rngs=nnx.Rngs(0))
+# Create the Poincaré ball manifold with curvature c=1.0
+manifold = PoincareBall(c=1.0)
+
+# Instantiate the hyperbolic model
+model = HyperbolicCNN(rngs=nnx.Rngs(0), manifold=manifold)
 learning_rate = 0.005
 momentum = 0.9
 
@@ -59,8 +91,8 @@ metrics = nnx.MultiMetric(
 )
 
 
-def loss_fn(model: CNN, batch):
-    logits = model(jnp.expand_dims(batch["image"], -1))
+def loss_fn(model: HyperbolicCNN, batch):
+    logits = model(jnp.expand_dims(batch["image"], 1))
     loss = optax.softmax_cross_entropy_with_integer_labels(
         logits=logits, labels=batch["label"]
     ).mean()
@@ -68,7 +100,7 @@ def loss_fn(model: CNN, batch):
 
 
 @nnx.jit
-def train_step(model: CNN, optimizer: nnx.Optimizer, metrics: nnx.MultiMetric, batch):
+def train_step(model: HyperbolicCNN, optimizer: nnx.Optimizer, metrics: nnx.MultiMetric, batch):
     grad_fn = nnx.value_and_grad(loss_fn, has_aux=True)
     (loss, logits), grads = grad_fn(model, batch)
     metrics.update(loss=loss, logits=logits, labels=batch["label"])
@@ -76,7 +108,7 @@ def train_step(model: CNN, optimizer: nnx.Optimizer, metrics: nnx.MultiMetric, b
 
 
 @nnx.jit
-def eval_step(model: CNN, metrics: nnx.MultiMetric, batch):
+def eval_step(model: HyperbolicCNN, metrics: nnx.MultiMetric, batch):
     loss, logits = loss_fn(model, batch)
     metrics.update(loss=loss, logits=logits, labels=batch["label"])
 

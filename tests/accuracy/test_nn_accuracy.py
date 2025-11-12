@@ -70,7 +70,7 @@ class TestHLinear:
         # Check output is on the manifold (within the ball)
         output_np = output.tensor.detach().cpu().numpy()
         norms = np.linalg.norm(output_np, axis=-1)
-        max_norm = 1.0 / np.sqrt(float(poincare_manifold.c))
+        max_norm = 1.0 / np.sqrt(float(poincare_manifold.curvature.value))
         assert np.all(norms < max_norm * 1.1), (
             "Output points should be within the Poincaré ball"
         )
@@ -118,7 +118,7 @@ class TestHLinear:
         # Check output is on the manifold
         output_np = output.tensor.detach().cpu().numpy()
         norms = np.linalg.norm(output_np, axis=-1)
-        max_norm = 1.0 / np.sqrt(float(poincare_manifold.c))
+        max_norm = 1.0 / np.sqrt(float(poincare_manifold.curvature.value))
         assert np.all(norms < max_norm * 1.1), (
             "Output points should be within the Poincaré ball"
         )

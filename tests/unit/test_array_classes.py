@@ -5,7 +5,7 @@ import jax.numpy as jnp
 
 from hypax.array._manifold_array import ManifoldArray
 from hypax.array._tangent_array import TangentArray
-from hypll.manifolds.poincare_ball import PoincareBall
+from hypax.manifolds.poincare_ball import PoincareBall
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ class TestManifoldArray:
             manifold = PoincareBall(c=c_value)
             man_array = ManifoldArray(data, manifold)
 
-            assert man_array.manifold.c == c_value
+            assert man_array.manifold.curvature.value == c_value
             assert jnp.array_equal(man_array.array, data)
 
     def test_manifold_array_preserves_dtype(self, poincare_manifold):

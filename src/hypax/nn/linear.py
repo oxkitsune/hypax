@@ -124,10 +124,10 @@ class HLinear(nnx.Module):
 
         # For PyTorch manifolds, we need to use the manifold's fully_connected method
         # For JAX manifolds, we can call it directly
-        if hasattr(self.manifold, 'c'):
+        if hasattr(self.manifold, 'curvature'):
             # Use JAX implementation directly
             from hypax.manifolds.poincare_ball._linalg import poincare_fully_connected
-            c_value = self.manifold.c() if callable(self.manifold.c) else self.manifold.c
+            c_value = self.manifold.curvature.value
             result_jax = poincare_fully_connected(
                 x=x_jax,
                 z=self.z.value,

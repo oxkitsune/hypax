@@ -84,6 +84,12 @@ class HConvolution2D(nnx.Module):
         """
         super().__init__()
 
+        # Validate manifold has curvature attribute
+        if not hasattr(manifold, "curvature"):
+            raise ValueError(
+                "Manifold must have a curvature attribute for hyperbolic convolution"
+            )
+
         # Normalize kernel_size to tuple
         self.kernel_size = _normalize_kernel_size(kernel_size)
         kernel_h, kernel_w = self.kernel_size
@@ -99,17 +105,6 @@ class HConvolution2D(nnx.Module):
         self.id_init = id_init
         self.dtype = dtype
         self.param_dtype = param_dtype
-
-        # Extract curvature from manifold
-        if hasattr(manifold, "c"):
-            self.c = manifold.c
-        elif hasattr(manifold, "curvature"):
-            self.c = manifold.curvature
-        else:
-            raise ValueError(
-                "Manifold must have a 'c' or 'curvature' attribute. "
-                "Please ensure your manifold is properly configured."
-            )
 
         # Initialize parameters
         param_key = rngs.params()
@@ -151,6 +146,9 @@ class HConvolution2D(nnx.Module):
                 f"Expected {self.in_channels} input channels, got {channels}"
             )
 
+        # Extract curvature from manifold
+        c = self.manifold.curvature.value
+
         # Calculate output spatial dimensions
         kernel_h, kernel_w = self.kernel_size
         out_height = (height + 2 * self.padding - kernel_h) // self.stride + 1
@@ -163,7 +161,7 @@ class HConvolution2D(nnx.Module):
             x=x.array,
             kernel_size=self.kernel_size,
             in_channels=self.in_channels,
-            c=self.c,
+            c=c,
             stride=self.stride,
             padding=self.padding,
             axis=1,  # Channel axis
@@ -178,7 +176,7 @@ class HConvolution2D(nnx.Module):
             x=x_unfolded,
             z=self.weights.value,
             bias=bias_value,
-            c=self.c,
+            c=c,
             axis=1,  # Apply FC along the feature dimension
         )
 

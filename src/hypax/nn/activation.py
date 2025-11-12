@@ -44,15 +44,11 @@ def hrelu(
 
     # Get curvature from manifold if not provided
     if c is None:
-        # Assume manifold has a curvature attribute (you may need to adjust this)
-        if hasattr(manifold, "c"):
-            c = manifold.c
-        elif hasattr(manifold, "curvature"):
-            c = manifold.curvature
-        else:
+        if not hasattr(manifold, 'curvature'):
             raise ValueError(
-                "Curvature not provided and cannot be extracted from manifold"
+                "Curvature not provided and manifold does not have curvature attribute"
             )
+        c = manifold.curvature.value
 
     # Step 1: Map from manifold to tangent space at origin
     tangent = logmap0(data, c, axis=axis)
@@ -100,15 +96,11 @@ def helu(
 
     # Get curvature from manifold if not provided
     if c is None:
-        # Assume manifold has a curvature attribute
-        if hasattr(manifold, "c"):
-            c = manifold.c
-        elif hasattr(manifold, "curvature"):
-            c = manifold.curvature
-        else:
+        if not hasattr(manifold, 'curvature'):
             raise ValueError(
-                "Curvature not provided and cannot be extracted from manifold"
+                "Curvature not provided and manifold does not have curvature attribute"
             )
+        c = manifold.curvature.value
 
     # Step 1: Map from manifold to tangent space at origin
     tangent = logmap0(data, c, axis=axis)
