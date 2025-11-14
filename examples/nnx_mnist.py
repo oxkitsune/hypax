@@ -1,5 +1,4 @@
 from flax import nnx
-from functools import partial
 import optax
 from datasets import load_dataset
 import jax.numpy as jnp
@@ -10,7 +9,7 @@ from hypax.utils.data import NumpyLoader
 from hypax.opt import riemannian_adam
 from hypax.manifolds.poincare_ball import PoincareBall
 from hypax.array import ManifoldArray
-from hypax.nn import HConvolution2D, HLinear, hrelu
+from hypax.nn import HAvgPool2D, HConvolution2D, HLinear, hrelu
 
 print("Loading dataset...")
 
@@ -38,7 +37,7 @@ class HyperbolicCNN(nnx.Module):
         self.conv2 = HConvolution2D(
             32, 64, kernel_size=3, padding=1, manifold=manifold, rngs=rngs
         )
-        self.avg_pool = partial(nnx.avg_pool, window_shape=(2, 2), strides=(2, 2))
+        self.pool = HAvgPool2D(kernel_size=2, stride=2, manifold=manifold)
         # Hyperbolic linear layers
         self.linear1 = HLinear(
             64 * 7 * 7, 256, manifold=manifold, rngs=rngs
@@ -52,12 +51,11 @@ class HyperbolicCNN(nnx.Module):
         # Hyperbolic conv + activation
         x = self.conv1(x)
         x = hrelu(x)
-        # Pool in regular space (extract array, pool, wrap back)
-        x = ManifoldArray(data=self.avg_pool(x.array), manifold=self.manifold)
+        x = self.pool(x)
 
         x = self.conv2(x)
         x = hrelu(x)
-        x = ManifoldArray(data=self.avg_pool(x.array), manifold=self.manifold)
+        x = self.pool(x)
 
         # Flatten to (batch_size, 64*7*7)
         batch_size = x.shape[0]

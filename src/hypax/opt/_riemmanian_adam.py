@@ -12,10 +12,21 @@ def riemannian_adam(
 ) -> GradientTransformation:
     beta1, beta2 = betas
 
+    def _zeros_like_accumulator(ref):
+        if ref.ndim == 0:
+            return jnp.zeros_like(ref)
+        shape = ref.shape[:-1] + (1,)
+        return jnp.zeros(shape, dtype=ref.dtype)
+
+    def _sum_squares_last_axis(arr):
+        if arr.ndim == 0:
+            return arr**2
+        return jnp.sum(arr**2, axis=-1, keepdims=True)
+
     def init_fn(params):
         def _init_leaf(p):
             m = jnp.zeros_like(p["tensor"] if isinstance(p, dict) else p)
-            v = jnp.zeros_like(m if p.ndim == 0 else m.sum(axis=-1, keepdims=True))
+            v = _zeros_like_accumulator(m)
             buf = {"m": m, "v": v, "step": jnp.zeros([], jnp.int32)}
             if amsgrad:
                 buf["v_hat"] = jnp.zeros_like(v)
@@ -33,7 +44,12 @@ def riemannian_adam(
                 g = g + weight_decay * x
                 g = M.euc_to_tangent(x, g)
                 m = beta1 * s["m"] + (1 - beta1) * g
-                v = beta2 * s["v"] + (1 - beta2) * M.inner(g, g, keepdim=True)
+                v = beta2 * s["v"] + (1 - beta2) * M.inner(
+                    x,
+                    g,
+                    g,
+                    keepdims=True,
+                )
 
                 v_corr = v / (1 - beta2**step)
                 if amsgrad:
@@ -51,7 +67,7 @@ def riemannian_adam(
                 # euclidean leaf
                 g = g + weight_decay * p
                 m = beta1 * s["m"] + (1 - beta1) * g
-                v = beta2 * s["v"] + (1 - beta2) * jnp.sum(g**2, axis=-1, keepdims=True)
+                v = beta2 * s["v"] + (1 - beta2) * _sum_squares_last_axis(g)
 
                 v_corr = v / (1 - beta2**step)
                 if amsgrad:

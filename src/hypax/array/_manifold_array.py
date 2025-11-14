@@ -15,6 +15,10 @@ class ManifoldArray:
     def ndim(self):
         return self.array.ndim
 
+    def dim(self) -> int:
+        """PyTorch-style alias used by some shared helpers."""
+        return self.array.ndim
+
     @property
     def shape(self):
         return self.array.shape

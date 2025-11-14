@@ -19,6 +19,14 @@ from hypax.manifolds.poincare_ball._diffgeom import (
     project,
     mobius_add,
     dist,
+    inner as poincare_inner,
+    euc_to_tangent as poincare_euc_to_tangent,
+    transp as poincare_transp,
+    cdist as poincare_cdist,
+)
+from hypax.manifolds.poincare_ball._stats import (
+    frechet_mean as poincare_frechet_mean,
+    midpoint as poincare_midpoint,
 )
 
 
@@ -132,6 +140,94 @@ class PoincareBall(Manifold):
             Hyperbolic distance
         """
         return dist(x, y, self.curvature.value, axis=axis, keepdims=keepdims)
+
+    def cdist(self, x: jax.Array, y: jax.Array) -> jax.Array:
+        """Pairwise hyperbolic distances between batches of points."""
+        return poincare_cdist(x, y, self.curvature.value)
+
+    def frechet_mean(
+        self,
+        x: jax.Array,
+        *,
+        reduce_axis: int,
+        axis: int = -1,
+        keepdims: bool = False,
+        max_iter: int = 100,
+        rtol: float = 1e-6,
+        atol: float = 1e-6,
+    ) -> jax.Array:
+        """Compute the Fréchet mean of points along ``reduce_axis``."""
+        return poincare_frechet_mean(
+            x=x,
+            c=self.curvature.value,
+            manifold_axis=axis,
+            reduce_axis=reduce_axis,
+            keepdims=keepdims,
+            max_iter=max_iter,
+            rtol=rtol,
+            atol=atol,
+        )
+
+    def midpoint(
+        self,
+        x: jax.Array,
+        *,
+        reduce_axis: int,
+        axis: int = -1,
+        keepdims: bool = False,
+    ) -> jax.Array:
+        """Compute the hyperbolic midpoint along ``reduce_axis``."""
+        return poincare_midpoint(
+            x=x,
+            c=self.curvature.value,
+            manifold_axis=axis,
+            reduce_axis=reduce_axis,
+            keepdims=keepdims,
+        )
+
+    def inner(
+        self,
+        x: jax.Array,
+        u: jax.Array,
+        v: jax.Array,
+        axis: int = -1,
+        keepdims: bool = False,
+    ) -> jax.Array:
+        """Riemannian inner product at point ``x`` between tangent vectors ``u`` and ``v``."""
+
+        return poincare_inner(
+            x=x,
+            u=u,
+            v=v,
+            c=self.curvature.value,
+            axis=axis,
+            keepdims=keepdims,
+        )
+
+    def euc_to_tangent(
+        self, x: jax.Array, u: jax.Array, axis: int = -1
+    ) -> jax.Array:
+        """Project Euclidean tensor ``u`` onto the tangent space at ``x``."""
+
+        return poincare_euc_to_tangent(
+            x=x,
+            u=u,
+            c=self.curvature.value,
+            axis=axis,
+        )
+
+    def transp(
+        self, x: jax.Array, y: jax.Array, v: jax.Array, axis: int = -1
+    ) -> jax.Array:
+        """Parallel transport ``v`` from tangent space at ``x`` to tangent space at ``y``."""
+
+        return poincare_transp(
+            x=x,
+            y=y,
+            v=v,
+            c=self.curvature.value,
+            axis=axis,
+        )
 
     def construct_dl_parameters(
         self,

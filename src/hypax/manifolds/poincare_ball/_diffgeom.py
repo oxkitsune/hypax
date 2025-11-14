@@ -172,5 +172,34 @@ def mobius_add_batch(x: jax.Array, y: jax.Array, c: jax.Array) -> jax.Array:
     return num / jnp.clip(jnp.expand_dims(denom, axis=3), min=1e-15)
 
 
+def _ensure_batch_dim(tensor: jax.Array) -> tuple[jax.Array, bool]:
+    if tensor.ndim == 3:
+        return tensor, False
+    if tensor.ndim == 2:
+        return tensor[jnp.newaxis, ...], True
+    raise ValueError("Expected tensor with 2 or 3 dimensions")
+
+
 def cdist(x: jax.Array, y: jax.Array, c: jax.Array) -> jax.Array:
-    return 2 / jnp.sqrt(c) * jnp.atanh(jnp.sqrt(c) * mobius_add_batch(-x, y, c))
+    x, squeezed_x = _ensure_batch_dim(x)
+    y, squeezed_y = _ensure_batch_dim(y)
+
+    if x.shape[0] != y.shape[0]:
+        if x.shape[0] == 1:
+            x = jnp.broadcast_to(x, (y.shape[0],) + x.shape[1:])
+            squeezed_x = False
+        elif y.shape[0] == 1:
+            y = jnp.broadcast_to(y, (x.shape[0],) + y.shape[1:])
+            squeezed_y = False
+        else:
+            raise ValueError(
+                f"Cannot broadcast batch dimensions: x has {x.shape[0]}, y has {y.shape[0]}"
+            )
+
+    diffs = mobius_add_batch(-x, y, c)
+    norm = jnp.linalg.norm(diffs, axis=-1)
+    distances = 2 / jnp.sqrt(c) * jnp.atanh(jnp.sqrt(c) * norm)
+
+    if x.shape[0] == 1 and squeezed_x and squeezed_y:
+        return distances[0]
+    return distances
