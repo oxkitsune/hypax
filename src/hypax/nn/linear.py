@@ -12,8 +12,6 @@ from flax import nnx
 from hypax.array import ManifoldArray
 from hypax.manifolds import Manifold
 
-Dtype = jnp.dtype
-
 
 class HLinear(nnx.Module):
     """Hyperbolic (Poincaré) fully-connected layer for JAX/nnx."""
@@ -25,8 +23,8 @@ class HLinear(nnx.Module):
         manifold: Manifold,
         *,
         use_bias: bool = True,
-        dtype: tp.Optional[Dtype] = None,
-        param_dtype: Dtype = jnp.float32,
+        dtype: tp.Optional[jnp.dtype] = None,
+        param_dtype: jnp.dtype = jnp.float32,
         rngs: nnx.Rngs,
     ):
         """

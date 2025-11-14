@@ -4,8 +4,6 @@ import jax
 import jax.numpy as jnp
 import typing as tp
 
-Dtype = jnp.dtype
-
 
 class Manifold(nnx.Module, ABC):
     """Abstract base class for Riemannian manifolds.
@@ -80,7 +78,7 @@ class Manifold(nnx.Module, ABC):
         bias: bool = True,
         key_z: jax.Array | None = None,
         key_bias: jax.Array | None = None,
-        dtype: Dtype = jnp.float32,
+        dtype: jnp.dtype = jnp.float32,
     ) -> tp.Tuple[jax.Array, jax.Array | None]:
         """Construct parameters for deep learning layers.
 
